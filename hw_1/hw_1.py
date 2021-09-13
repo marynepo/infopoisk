@@ -24,31 +24,33 @@ def preprocess_text(text):
     return ''.join(text)[:-1]
 
 
-def index_mtx(texts):
+def index_dict(texts):
     corpus = [preprocess_text(i) for i in texts]
     vectorizer = CountVectorizer(analyzer='word')
-    ind_mtx = vectorizer.fit_transform(corpus)
-    matrix_freq = np.asarray(ind_mtx.sum(axis=0)).ravel()
-    return ind_mtx, np.array([np.array(vectorizer.get_feature_names()), matrix_freq])
+    count_mtx = vectorizer.fit_transform(corpus).toarray()
+    mtx_freq = np.asarray(count_mtx.sum(axis=0)).ravel()
+    frq = mtx_freq.astype(int)
+    ind_dict = {}
+    for i, word in enumerate(vectorizer.get_feature_names()):
+        ind_dict[word] = {'docs': np.nonzero(count_mtx[:, i])[0], 'freq': frq[i]}
+    return ind_dict
 
 
-X, mtx = index_mtx(docs)
-frq = mtx[1, :].astype(float)
-mon = ('Моника', frq[np.where(mtx[0] == 'моника')][0] + frq[np.where(mtx[0] == 'мон')][0])
-chen = ('Чендлер',
-        frq[np.where(mtx[0] == 'чендлер')][0] + frq[np.where(mtx[0] == 'чен')][0] + frq[np.where(mtx[0] == 'чэндлер')][
-            0])
-rach = ('Рейчел',
-        frq[np.where(mtx[0] == 'рэйчел')][0] + frq[np.where(mtx[0] == 'рейч')][0] + frq[np.where(mtx[0] == 'рейчел')][
-            0])
-ross = ('Росс', frq[np.where(mtx[0] == 'росс')][0])
-joe = ('Джоуи', frq[np.where(mtx[0] == 'джоуи')][0] + frq[np.where(mtx[0] == 'джо')][0])
-phib = ('Фиби', frq[np.where(mtx[0] == 'фиби')][0] + frq[np.where(mtx[0] == 'фибс')][0])
+ind_d = index_dict(docs)
+mon = ('Моника', ind_d['моника']['freq'] + ind_d['мон']['freq'])
+chen = ('Чендлер', ind_d['чендлер']['freq'] + ind_d['чен']['freq'] + ind_d['чэндлер']['freq'])
+rach = ('Рейчел', ind_d['рэйчел']['freq'] + ind_d['рейч']['freq'] + ind_d['рейчел']['freq'])
+ross = ('Росс', ind_d['росс']['freq'])
+joe = ('Джоуи', ind_d['джоуи']['freq'] + ind_d['джо']['freq'])
+phib = ('Фиби', ind_d['фиби']['freq'] + ind_d['фибс']['freq'])
 heros = [mon, chen, rach, ross, joe, phib]
 
 print('Самый популярный герой:', max(heros, key=lambda x: x[1])[0])
-print('Самое частотное слово:', mtx[0][np.argmax(frq)])
-print('Самое редкое слово:', mtx[0][np.argmin(frq)])
-print(
-    'Слова, которые есть во всех документах:',
-    ', '.join(mtx[0][np.where(np.prod(X.toarray().astype(float), axis=0) != 0)]))
+print('Самое популярное слово:', max(ind_d.items(), key=lambda x: x[1]['freq'])[0])
+print('Самое редкое слово:', min(ind_d.items(), key=lambda x: x[1]['freq'])[0])
+
+wds = []
+for word in ind_d.keys():
+    if len(ind_d[word]['docs']) == len(docs):
+        wds.append(word)
+print('Слова, которые есть во всех документах:', ', '.join(wds))
