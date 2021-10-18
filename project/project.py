@@ -1,7 +1,6 @@
 import os
 import gensim
-from gensim.summarization.bm25 import BM25
-from gensim.models import KeyedVectors, Word2Vec
+from gensim.models import KeyedVectors
 import json
 from scipy import sparse
 from nltk.tokenize import word_tokenize
@@ -19,6 +18,7 @@ import pickle
 from time import time
 import nltk
 import joblib
+from sklearn.metrics.pairwise import cosine_similarity
 
 nltk.download('stopwords')
 sw = stopwords.words('russian')
@@ -34,7 +34,7 @@ def preprocess_text(text):
 def ind_query(qr, vct_name, vct):
     pr_qr = preprocess_text(qr)
     if vct_name in ['tfidf', 'cv', 'bm25']:
-        return vct.transform([pr_qr]).toarray()
+        return vct.transform([pr_qr])
     elif vct_name == 'fasttext':
         return np.mean(vct[qr.split()], axis=0)
     else:
@@ -47,24 +47,23 @@ def ind_query(qr, vct_name, vct):
 
 
 def calc_distance(qr, ind_mtx):
-    dist = 1 - distance.cdist(ind_mtx, qr, 'cosine')
+    dist = cosine_similarity(ind_mtx, qr)
     return dist
 
 
 def get_top(qr, vct_name, vct, answers, mtx):
     ind_q = ind_query(qr, vct_name, vct)
-    if vct_name == 'bert':
+    if vct_name in ['bert','fasttext']:
         ind_q = ind_q.reshape(ind_q.shape[0], 1).T
     sort_ind = calc_distance(ind_q, mtx).argsort(axis=0)[-1::-1]
-    return np.array(answers)[sort_ind].tolist()[:5]
+    return np.array(answers)[sort_ind][:5]
 
 
-@st.cache
 def load_data():
     with open('data.pickle', 'rb') as f:
         data = pickle.load(f)
     vct_dt = {}
-    for vct_name in ['bm25', 'tfidf', 'cv', 'fasttext', 'bert']:
+    for vct_name in ['bm25', 'tfidf', 'cv', 'bert', 'fasttext']:
         with open(vct_name + '_data', 'rb') as f:
             vct_dt[vct_name] = joblib.load(f)
     return data['ans'], vct_dt
